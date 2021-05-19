@@ -55,3 +55,8 @@ func incrementIP(ip net.IP) {
 		}
 	}
 }
+
+func IsIPv6CIDR(cidr string) bool {
+	ip, _, _ := net.ParseCIDR(cidr)
+	return ip != nil && ip.To4() == nil
+}
