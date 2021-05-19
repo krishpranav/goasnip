@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"regexp"
 )
 
 type sliceVal []string
@@ -84,4 +85,10 @@ func getIP(ipdomain string) []net.IP {
 		log.Fatalf("[!] Error looking up domain: %s\n", err.Error())
 	}
 	return ip
+}
+
+func parseResponse(response string) []string {
+	r := regexp.MustCompile(`[^\s"']+|"([^"]*)"|'([^']*)`)
+	arr := r.FindAllString(response, -1)
+	return arr
 }
