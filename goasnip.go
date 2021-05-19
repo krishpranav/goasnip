@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strings"
 )
 
 type sliceVal []string
@@ -91,4 +92,11 @@ func parseResponse(response string) []string {
 	r := regexp.MustCompile(`[^\s"']+|"([^"]*)"|'([^']*)`)
 	arr := r.FindAllString(response, -1)
 	return arr
+}
+
+func checkAPIRateLimit(response string) {
+	if strings.Contains(response, "API") {
+		fmt.Println("[!] The Hacker Target API limit was reached, exiting.....")
+		os.Exit(0)
+	}
 }
