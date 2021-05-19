@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -31,7 +33,7 @@ func writeLines(lines []string, path string) error {
 
 	w := bufio.NewWriter(file)
 	for _, line := range lines {
-		fmt.Fprintf(w, line)
+		fmt.Fprintln(w, line)
 	}
 	return w.Flush()
 }
@@ -39,12 +41,14 @@ func writeLines(lines []string, path string) error {
 func httpRequest(URI string) string {
 	response, errGet := http.Get(URI)
 	if errGet != nil {
-		log.Fatalf("[!] Error Sending request: %s\n", errGet.Error())
+		log.Fatalf("[!] Error sending request: %s\n", errGet.Error())
 	}
+
 	responseText, errRead := ioutil.ReadAll(response.Body)
 	if errRead != nil {
 		log.Fatalf("[!] Error reading response: %s\n", errRead.Error())
 	}
+
 	defer response.Body.Close()
 	return string(responseText)
 }
@@ -68,11 +72,13 @@ func CIDRToIP(cidr string) []string {
 	if err != nil {
 		log.Fatalf("[!] Failed to convert CIDR to IP: %s\n", err.Error())
 	}
+
 	var ips []string
 	for ip := ip.Mask(ipnet.Mask); ipnet.Contains(ip); incrementIP(ip) {
 		ips = append(ips, ip.String())
 	}
 
+	// Exclude network and broadcast addresses
 	if len(ips) >= 3 {
 		return ips[1 : len(ips)-1]
 	} else {
@@ -96,7 +102,61 @@ func parseResponse(response string) []string {
 
 func checkAPIRateLimit(response string) {
 	if strings.Contains(response, "API") {
-		fmt.Println("[!] The Hacker Target API limit was reached, exiting.....")
+		fmt.Println("[!] The HackerTarget API limit was reached, exiting...")
 		os.Exit(0)
 	}
+}
+
+func main() {
+	var (
+		target = flag.String("t", "", "Domain or IP address (Required)")
+		print  = flag.Bool("p", false, "Print results to console")
+	)
+
+	flag.Parse()
+
+	ipAddress := getIP(*target)[0]
+
+	apiRequest := fmt.Sprintf("https://api.hackertarget.com/aslookup/?q=%s", ipAddress)
+	apiResponse := httpRequest(apiRequest)
+	apiResponseInfo := parseResponse(apiResponse)
+	checkAPIRateLimit(apiResponse)
+
+	fmt.Printf("[?] ASN: %s ORG: %s\n", apiResponseInfo[2], apiResponseInfo[6])
+
+	apiASRequest := fmt.Sprintf("https://api.hackertarget.com/aslookup/?q=AS%s", strings.Trim(apiResponseInfo[2], "\""))
+	apiASResponse := httpRequest(apiASRequest)
+	apiASResponseInfo := parseResponse(apiASResponse)
+	checkAPIRateLimit(apiASResponse)
+
+	var CIDRSv4 []string
+	for _, cidrv4 := range apiASResponseInfo[3:] {
+		if !IsIPv6CIDR(cidrv4) {
+			CIDRSv4 = append(CIDRSv4, cidrv4)
+		}
+	}
+	sort.Strings(CIDRSv4)
+
+	if *print {
+		fmt.Print(sliceVal(CIDRSv4))
+	}
+	fmt.Printf("[:] Writing %d CIDRs to file...\n", len(CIDRSv4))
+	writeLines(CIDRSv4, "cidrs.txt")
+
+	var ips []string
+	fmt.Println("[:] Converting to IPs...")
+	for _, cidr := range CIDRSv4 {
+		ips = append(ips, CIDRToIP(cidr)...)
+	}
+
+	if *print {
+		for _, ipsValue := range ips {
+			fmt.Println(ipsValue)
+		}
+	}
+
+	fmt.Printf("[:] Writing %d IPs to file...\n", len(ips))
+	writeLines(ips, "ips.txt")
+
+	fmt.Println("[!] Done.")
 }
