@@ -60,3 +60,20 @@ func IsIPv6CIDR(cidr string) bool {
 	ip, _, _ := net.ParseCIDR(cidr)
 	return ip != nil && ip.To4() == nil
 }
+
+func CIDRToIP(cidr string) []string {
+	ip, ipnet, err := net.ParseCIDR(cidr)
+	if err != nil {
+		log.Fatalf("[!] Failed to convert CIDR to IP: %s\n", err.Error())
+	}
+	var ips []string
+	for ip := ip.Mask(ipnet.Mask); ipnet.Contains(ip); incrementIP(ip) {
+		ips = append(ips, ip.String())
+	}
+
+	if len(ips) >= 3 {
+		return ips[1 : len(ips)-1]
+	} else {
+		return ips
+	}
+}
