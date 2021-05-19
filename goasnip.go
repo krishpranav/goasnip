@@ -3,7 +3,9 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 )
 
@@ -29,4 +31,17 @@ func writeLines(lines []string, path string) error {
 		fmt.Fprintf(w, line)
 	}
 	return w.Flush()
+}
+
+func httpRequest(URI string) string {
+	response, errGet := http.Get(URI)
+	if errGet != nil {
+		log.Fatalf("[!] Error Sending request: %s\n", errGet.Error())
+	}
+	responseText, errRead := ioutil.ReadAll(response.Body)
+	if errRead != nil {
+		log.Fatalf("[!] Error reading response: %s\n", errRead.Error())
+	}
+	defer response.Body.Close()
+	return string(responseText)
 }
