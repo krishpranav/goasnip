@@ -77,3 +77,11 @@ func CIDRToIP(cidr string) []string {
 		return ips
 	}
 }
+
+func getIP(ipdomain string) []net.IP {
+	ip, err := net.LookupIP(ipdomain)
+	if err != nil {
+		log.Fatalf("[!] Error looking up domain: %s\n", err.Error())
+	}
+	return ip
+}
